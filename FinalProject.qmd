@@ -1,0 +1,303 @@
+---
+title: "RD2.qmd"
+author: "Lihame Arouna" 
+institute: "University of Pennyslvania" 
+date: last-modified 
+toc: true 
+
+format: 
+  html: 
+    self-contained: true 
+
+editor: source 
+---
+
+```{r, error = FALSE, message = FALSE}
+library(haven)
+library(tidyverse)
+library(gt)
+library(dplyr)
+library(readxl)
+library(data.table)
+library(arrow) 
+library(ggplot2)
+library(knitr)
+library(scales)
+library(modelsummary)
+library(lme4)
+library(ggeffects)
+```
+
+
+```{r, error=FALSE, message=FALSE}
+AidData <- try(read_excel("/Users/lihamearouna/Dropbox/PSCI3200/ADv3.xlsx", sheet = "GCDF_3.0"))
+
+# Now df should not generate warnings for those columns anymore
+# Select only the necessary columns manually (update column names as needed)
+AidData <- AidData[,c("Recipient", "Completion Year", "Title", "Description", "Status", "Recipient Region", 'Amount (Constant USD 2021)')]  
+
+# Converting to data.table for memory efficiency & reloading 
+AidData <- as.data.table(AidData)
+write_parquet(AidData, "AidData.parquet")
+AidData <- read_parquet("AidData.parquet")
+
+#Changing Recipient name 
+AidData <- AidData |> 
+  rename(COUNTRY = Recipient,
+         Amount = 'Amount (Constant USD 2021)', 
+         Region = 'Recipient Region' ) |> 
+  filter(Region == 'Africa')
+head(AidData)
+
+# Afrobarometer Merged 8 
+# Defining the URL and destination file name
+url <- "https://www.afrobarometer.org/wp-content/uploads/2023/03/afrobarometer_release-dataset_merge-34ctry_r8_en_2023-03-01.sav"
+destfile <- "afrobarometer_r8.sav"
+
+download.file(url, destfile = destfile, mode = "wb")
+data8 <- haven::read_sav(destfile)
+# Renaming numeric country column 
+colnames(data8)[colnames(data8) == "COUNTRY"] <-  "country_id"
+
+```
+
+```{r, error=FALSE, message=FALSE}
+
+#Adjusting data sets for merge 
+# Create a separate data frame with country ID-country name 
+country_mapping <- data.frame(
+  country_id = c(2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25,26,27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40), 
+  COUNTRY = c("Angola", "Benin", "Botswana", "Burkina Faso", "Cabo Verde", "Cameroon", 
+                   "CongoBrazzaville", "Côte d'Ivoire", "Eswatini", "Ethiopia", "Gabon", "Gambia", 
+                   "Ghana", "Guinea", "Kenya", "Lesotho", "Liberia", "Madagascar", "Malawi", "Mali", 
+                   "Mauritania", "Mauritius", "Morocco", "Mozambique", "Namibia", "Niger", "Nigeria",
+                   "São Tomé and Príncipe", "Senegal", "Seychelles", "Sierra Leone", "South Africa", 
+                   "Sudan", "Tanzania", "Togo", "Tunisia", "Uganda", "Zambia", "Zimbabwe")
+)
+#Merging using numercic country ID to get a dataset that is traceable by country name
+first_merge <- left_join(data8, country_mapping, by = "country_id")
+#Grouping to match by total aid per country for sake of memory and findings 
+AidData_summary <- AidData |> 
+  group_by(COUNTRY) |>
+  summarize(total_aid = sum(Amount, na.rm = TRUE)) 
+merged_data <- left_join(AidData_summary, first_merge, by = "COUNTRY")
+
+```
+
+Graph 1: Plotting the relationship between total investment and public perception
+
+```{r, error=FALSE, message=FALSE}
+# filtering responses to only include responses of yes or no.
+filtered_data <- merged_data |> filter(Q65C %in% c(0, 1))
+ggplot(filtered_data, aes(x = factor(Q65C), y = total_aid)) +
+  geom_boxplot(fill = "lightblue", outlier.alpha = 0.3) +
+  labs(
+    title = "Total Investment by Public Perception of Chinese Debt",
+    x = "Public Perception (Q65C)",
+    y = "Total Investment (USD)"
+  ) +
+  theme_bw() +
+  scale_y_continuous(labels = scales::comma) +
+  scale_x_discrete(labels = c(
+    `0` = "No",
+    `1` = "Yes",
+    `7` = "Not applicable",
+    `8` = "Refused",
+    `9` = "Don’t know",
+    `-1` = "Missing"
+  )) 
+
+```
+
+
+```{r, error=FALSE, message=FALSE}
+# Summarizing data by public perception
+summary_data <- filtered_data |>
+  #calculating mean & variability of aid received by groups defined by perception of Chinese debt 
+  group_by(Q65C) |> 
+  summarise(
+    mean_investment = mean(total_aid, na.rm = TRUE),
+    sd = sd(total_aid, na.rm = TRUE),
+    n = n(),
+    se = sd / sqrt(n)
+  )
+
+
+summary_data$Q65C <- factor(summary_data$Q65C, 
+                         levels = c(0, 1), 
+                         labels = c("No", "Yes"))
+
+# Bar chart with error bars
+ggplot(summary_data, aes(x = Q65C, y = mean_investment)) +
+  geom_col(fill = "orange") +
+  geom_errorbar(aes(ymin = mean_investment - se, ymax = mean_investment + se), width = 0.2) +
+  scale_y_continuous(labels = scales::comma) +
+  labs(
+    title = "Average Total Investment by Public Perception of Chinese Debt",
+    x = "Public Perception (Q65C)",
+    y = "Average Total Investment (USD)"
+  ) +
+  theme_minimal()
+```
+
+
+Covariates 
+Fized effects: Modeling people's opinions about Chinese debt (a binary variable, Q65C), as a function of covariates and accounting for regiohnal differences 
+Estimates the log-odds that they think Chinese loans are a problem.
+
+Adjusts estimates based on their education, employment, and trust in the president.
+
+Adds a region-specific intercept to account for regional-level bias or influence.
+```{r, error=FALSE, message=FALSE}
+#grouping education, employment, and trust in president data into few key groups 
+analysis_data <- filtered_data |> 
+  mutate(
+    education_group = case_when(
+      Q97 %in% 0:2 ~ "Low",
+      Q97 %in% 3:5 ~ "Medium",
+      Q97 %in% 6:9 ~ "High",
+      TRUE ~ NA_character_
+    ),
+    employment_status = case_when(
+      Q95A == 0 ~ "Not looking",
+      Q95A == 1 ~ "Looking",
+      Q95A == 2 ~ "Part-time",
+      Q95A == 3 ~ "Full-time",
+      TRUE ~ NA_character_
+    ),
+    trust_president = case_when(
+      Q41A %in% c(0,1) ~ "Low",
+      Q41A == 2 ~ "Medium",
+      Q41A == 3 ~ "High",
+      TRUE ~ NA_character_
+    ),
+    # Converting to factors
+    education_group = factor(education_group, levels = c("Low", "Medium", "High")),
+    employment_status = factor(employment_status),
+    trust_president = factor(trust_president, levels = c("Low", "Medium", "High")),
+    REGION = factor(REGION)
+  )
+
+# Ensuring Q65C is treated as a factor (Yes = 1, No = 0)
+analysis_data$Q65C <- factor(analysis_data$Q65C, levels = c(0, 1), labels = c("No", "Yes"))
+
+#Model 1 (no Fixed Effects)
+model1 <- glm(
+  Q65C ~ education_group + employment_status + trust_president,
+  data = analysis_data,
+  family = binomial(link = "logit")
+)
+
+#Model 2 (region as fixed effects)
+model2 <- glm(
+  Q65C ~ education_group + employment_status + trust_president + REGION,
+  data = analysis_data,
+  family = binomial(link = "logit")
+)
+#Model 1 & 2 displayed side by side 
+modelsummary(
+  list(
+    "Without Region Fixed Effects" = model1,
+    "With Region Fixed Effects" = model2
+  ),
+  stars = TRUE,
+  output = "markdown",
+  title = "Logistic Regression: Predictors of Opinion on Chinese Debt",
+  coef_map = c(
+    "education_groupMedium" = "Education: Medium",
+    "education_groupHigh" = "Education: High",
+    "employment_statusLooking" = "Employment: Looking",
+    "employment_statusPart-time" = "Employment: Part-time",
+    "employment_statusFull-time" = "Employment: Full-time",
+    "trust_presidentMedium" = "Trust in President: Medium",
+    "trust_presidentHigh" = "Trust in President: High"
+  )
+)
+```
+
+Excellent — you're aiming to explicitly define four groups that capture the intersection of:
+
+Education level (Low vs. High)
+
+Country-level debt exposure (Low vs. High)
+
+This is a great way to illustrate cross-national variation in perception, especially in how access to information (via education) conditions responses to Chinese debt.
+
+
+```{r, error=FALSE, message=FALSE}
+#summarize total aid by country and placing in high/low buckets 
+country_debt <- analysis_data |> 
+  group_by(COUNTRY) |> 
+  summarise(
+    mean_investment = mean(total_aid, na.rm = TRUE)
+  ) |> 
+  mutate(
+    debt_level = ifelse(mean_investment > median(mean_investment, na.rm = TRUE), "High", "Low"),
+    debt_level = factor(debt_level, levels = c("Low", "High"))
+  )
+
+#merging back into data set 
+analysis_data <- analysis_data |> 
+  left_join(country_debt |> select(COUNTRY, debt_level), by = "COUNTRY")
+
+# Creating an interaction group variable 
+
+analysis_data_filtered <- analysis_data |>
+  filter(education_group %in% c("Low", "High"))
+
+# Create combined variable: 4 interaction groups
+analysis_data_filtered <- analysis_data_filtered |> 
+  mutate(edu_debt_group = case_when(
+    education_group == "Low" & debt_level == "Low" ~ "LowEd_LowDebt",
+    education_group == "Low" & debt_level == "High" ~ "LowEd_HighDebt",
+    education_group == "High" & debt_level == "Low" ~ "HighEd_LowDebt",
+    education_group == "High" & debt_level == "High" ~ "HighEd_HighDebt",
+    TRUE ~ NA_character_
+  )) |> 
+  mutate(edu_debt_group = factor(edu_debt_group,
+                                 levels = c("LowEd_LowDebt", "LowEd_HighDebt",
+                                            "HighEd_LowDebt", "HighEd_HighDebt"))) #LowEd_Lowdebts is the reference group, all other coefficients compare against it. 
+
+#estimate the model using the enw variable as your key indpendent variable 
+model_grouped <- glm(
+  Q65C ~ edu_debt_group + employment_status + trust_president,
+  data = analysis_data_filtered,
+  family = binomial(link = "logit")
+)
+
+#model summary 
+modelsummary(
+  model_grouped,
+  stars = TRUE,
+  title = "Perception of Chinese Loans by Education × Debt Level Groups",
+  coef_map = c(
+    "edu_debt_groupLowEd_HighDebt" = "LowEd × HighDebt",
+    "edu_debt_groupHighEd_LowDebt" = "HighEd × LowDebt",
+    "edu_debt_groupHighEd_HighDebt" = "HighEd × HighDebt",
+    "employment_statusLooking" = "Employment: Looking",
+    "employment_statusPart-time" = "Employment: Part-time",
+    "employment_statusFull-time" = "Employment: Full-time",
+    "trust_presidentMedium" = "Trust in President: Medium",
+    "trust_presidentHigh" = "Trust in President: High"
+  ),
+  output = "markdown"
+)
+
+
+#Plot predicted probabilities 
+
+# Get predictions for each group
+preds <- ggpredict(model_grouped, terms = "edu_debt_group")
+
+# Plot
+plot(preds) +
+  labs(
+    title = "Predicted Probability of Viewing Chinese Loans as a Problem",
+    x = "Education × Debt Group",
+    y = "Predicted Probability"
+  )
+
+```
+
+
+Bibliography

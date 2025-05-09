@@ -1,0 +1,215 @@
+---
+title: "Research Design 2"
+bibliography: References.bib
+editor: visual
+---
+
+```{r}
+library(haven)
+library(tidyverse)
+library(gt)
+library(dplyr)
+library(readxl)
+library(data.table)
+library(arrow) 
+library(ggplot2)
+library(knitr)
+library(scales)
+```
+
+Introduction
+
+	The rise of Chinese engagement in Africa has been hypervisible on the world stage and a point of contention for scholars looking at measures of impact and dependency within these countries. Two dominant schools of thought emerge as the framework through which this engagement is interpreted—those who view Chinese investment as a neo-colonial form of extractivism and those who see it as a mutually beneficial South-South partnership offering an alternative to Western conditional aid. As China and the US continue to compete for economic and geopolitical influence, African nations find themselves positioned in the center of the global tug of war, leveraging partnerships for developmental gain and wrestling with concerns of debt sustainability, democracy, and resource control. Prevailing narratives from the West would have it that Chinese investments are deleterious to democratic norms and governance structures in Africa, often portraying them as enabling authoritarian regimes, exacerbating corruption, and undermining transparency. The broader complexity of this debate is reflected in the differing stances of African politicians, with some embracing Chinese investment as a necessary catalyst for development, while others express concerns over debt dependency and governance implications. However, one crucial perspective that remains underexplored in the literature is that of African people themselves. This paper aims to foreground African perspectives in this ongoing debate. Moving beyond state-centric and Western-dominated narratives, this analysis seeks to highlight how Africans themselves interpret, navigate, and respond to Chinese engagement—whether as an opportunity for economic transformation, a source of new dependencies, or something more nuanced.
+
+ Existing studies, such as Linda Benabdallah Going Beyond Binary Narratives of China–Africa Relations,  examine the nature of Chinese investments within Africa from the macro perspective, while research by Hulby, Li, and Springman explores how geopolitical competition shapes perceptions of aid and investment. Building on these works, this study challenges the assumption that growing geopolitical competition fundamentally reshapes African nations' preferences for aid from either China or the West. Instead, it posits that–at least in the eyes of citizens– geopolitical competition has neutral effects on the ways in which they view aid—especially given that these external pressures have long since informed the African nations engagement with global powers.
+
+Using AidData’s Global Chinese Development Finance dataset and select questions from Round 9 of the Afrobarometer surveys, I will examine African citizens’ perceptions in relation to the amount of investment their countries receive. Specifically, I will use Question Q64c—"Do you think our government has borrowed too much money from China, or haven’t you heard enough to say?"—as a proxy for public awareness and attitudes toward Chinese development finance. This variable captures whether respondents believe their government has borrowed excessively from China, with value labels indicating 'Yes' (1), 'No' (0), 'Not applicable' (7), 'Refused' (8), 'Don’t know' (9), and 'Missing' (-1). It offers a useful lens to assess how perceptions may or may not align with actual financial inflows captured in the AidData dataset.
+
+To examine potential causal relationships between Chinese investment and citizens' perceptions of their government's borrowing behavior, I will treat the amount of Chinese development finance received by a country—as recorded in AidData’s Global Chinese Development Finance dataset—as the independent variable. I will analyze whether higher levels of Chinese investment correlate with a greater likelihood of respondents answering “yes” to Afrobarometer Question Q64c, indicating a belief that their government has borrowed too much from China. This variable will act as a proxy for examining the level of exposure individuals have to aid from China, with the assumption being that they would only have a formed opinion if they have directly or indirectly observed the impacts of Chinese investment—such as infrastructure projects, job creation, or media coverage—in their communities. 
+
+While observational data limits causal inference, I will strengthen causal claims by incorporating statistical controls for key confounding variables. In particular, I will control the education level, as more educated individuals may be more aware of international financial flows and more likely to form opinions about government borrowing. By comparing responses across different education groups, I aim to assess whether perceptions vary systematically with both investment exposure and individual-level characteristics, thereby helping to isolate the effect of Chinese investment on public opinion.
+
+**Data: Afrobarometer + AidData V3**
+
+Afrobarometer Merged Data 8: Includes a range of 40 African countries 
+
+\
+
+Q65A Question: To your knowledge, does China give loans or development assistance to our country’s government, or haven’t you had a chance to hear about this? Variable Label: Q65a. Country receives loans or development assistance from China Values: 0, 1, 8, 9, -1 Value Labels: 0=No, 1=Yes, 8=Refused, 9=Don’t know, -1=Missing. Source: Afrobarometer Round 8
+
+\
+\
+
+Question Number: Q65B Question: Do you think that our government is required to repay China for the loans and development assistance it provides to \[Botswana\], or haven’t you heard enough to say? Variable Label: Q65b. Government required to repay China for loans. Values: 0, 1, 7, 8, 9, -1 Value Labels: 0=No, 1=Yes, 7=Not applicable, 8=Refused, 9=Don’t know, -1=Missing. Source: Afrobarometer Round 8 Note: Interviewer was instructed that if the response to Q65A was 0=No or 9=DK they should select code 7=Not applicable. 
+
+\
+\
+
+Question Number: Q65C Question: Do you think our government has borrowed too much money from China, or haven’t you heard enough to say? Variable Label: Q64c. Government borrowed too much money from China Values: 0, 1, 7, 8, 9, -1 Value Labels: 0=No, 1=Yes, 7=Not applicable, 8=Refused, 9=Don’t know, -1=Missing. Source: Afrobarometer Round 8 Note: Interviewer was instructed that if the response to Q65A was 0=No or 9=DK they should select code 7=Not applicable. 
+
+\
+
+Question Number: Q65D Question: When the government of China gives loans or development assistance to \[Botswana\], do you think they put more requirements or fewer requirements on our government compared to other donor countries, or haven’t you heard enough to say? Variable Label: Q65d. Requirements on loans and assistance from China. Values: 0-4, 7, 8, 9, -1 Value Labels: 0=Far fewer requirements, 1=Somewhat fewer requirements, 2=About the same number of requirements, 3=Somewhat more requirements, 4=Many more requirements, 7=Not applicable, 8=Refused, 9=Don’t know, -1=Missing. Source: Afrobarometer Round 8 Note: Interviewer probed for strength of opinion.
+
+\
+
+Question Number: Q69A Question: In your opinion, which of the following countries, if any, would be the best model for the future development of our country, or is there some other country in Africa or elsewhere, that should be our model? Variable Label: Q69a. Best model for the future development Values: 0-7, 8, 9, 180, 300-302, 340, 380-382, 460, 500-501, 620, 660, 860-861, 900-903, 1100-1102, 1140-1142, 1220-1222, 1260, 1300-1301, 1500-1501, 1540, 1580-1581, 1620-1621, 1700-1701, 1740-1743, 1750-1751, -1 Value Labels: 0=None of these, 1=United States, 2=China, 3=Former colonial power, i.e Britain, France, or Portugal, 5=South Africa, 6=Ethiopia, 7=We should follow our own country’s model, 8=Refused, 9=Don’t know, 180=Ghana, 300=Rwanda, 301=Singapore, 302=Tanzania, 340=Botswana, 380=Ghana, 381=Japan, 382=Nigeria, 460=Zambia, 500=Cote d'Ivoire, 501=Arabie Saoudite, 620=KSA, 660=Rwanda, 860=Zambia, 861=Botswana, 900=Singapour, 901=Inde, 902=France, 903=Canada, 1100=Nigeria, 1101=Libye, 1102=Arabie Saoudite, 1140=Ghana, 1141=Allemagne, 1142=Benin, 1220=Rwanda, 1221=Nigeria, 1222=Canada, 1260=Japan, 1300=Senegal, 1301=Ivory Coast, 1500=Germany, 1501=Turkey, 1540=Saudi Arabia, 1580=Turkey, 1581=Germany, 1620=Mozambique, 1621=Lesotho, 1700=RWANDA, 1701=GUINÉE ÉQUATORIALE, 1740=Singapore, 1741=Senegal, 1742=Rwanda, 1743=United Arab Emirates, 1750=France, 1751=Brazil, -1=Missing. Source: Afrobarometer Round 8
+
+Question Number: Q69B Question: How much influence do you think China’s economic activities in \[Botswana\] have on our economy, or haven’t you heard enough to say? Variable Label: Q69b. Influence of China on Country Values: 0-3, 8, 9, -1 Value Labels: 0=None, 1=A little, 2=Some, 3=A lot, 8=Refused, 9=Don’t know, -1=Missing. Source: Afrobarometer Round 8
+
+\*\* Note that I am currently experiencing issues with graphing necessary information so have chosen to omit this from this update. 
+
+```{r}
+AidData <- read_excel(path = "/Users/lihamearouna/Dropbox/PSCI3200/ADv3.xlsx", sheet = "GCDF_3.0") 
+
+# Select only the necessary columns manually (update column names as needed)
+AidData <- AidData[,c("Recipient", "Completion Year", "Title", "Description", "Status", "Recipient Region", 'Amount (Constant USD 2021)')]  
+
+# Converting to data.table for memory efficiency & reloading 
+AidData <- as.data.table(AidData)
+write_parquet(AidData, "AidData.parquet")
+AidData <- read_parquet("AidData.parquet")
+
+#Changing Recipient name 
+AidData <- AidData |> 
+  rename(COUNTRY = Recipient,
+         Amount = 'Amount (Constant USD 2021)', 
+         Region = 'Recipient Region' ) |> 
+  filter(Region == 'Africa')
+head(AidData)
+
+
+# Afrobarometer Merged 8 
+# Defining the URL and destination file name
+url <- "https://www.afrobarometer.org/wp-content/uploads/2023/03/afrobarometer_release-dataset_merge-34ctry_r8_en_2023-03-01.sav"
+destfile <- "afrobarometer_r8.sav"
+
+download.file(url, destfile = destfile, mode = "wb")
+data8 <- read_sav(destfile)
+```
+
+```{r}
+
+#Adjusting data sets for merge 
+# Create a separate data frame with country ID-country name 
+country_mapping <- data.frame(
+  country_id = c(2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25,26,27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40), 
+  COUNTRY = c("Angola", "Benin", "Botswana", "Burkina Faso", "Cabo Verde", "Cameroon", 
+                   "CongoBrazzaville", "Côte d'Ivoire", "Eswatini", "Ethiopia", "Gabon", "Gambia", 
+                   "Ghana", "Guinea", "Kenya", "Lesotho", "Liberia", "Madagascar", "Malawi", "Mali", 
+                   "Mauritania", "Mauritius", "Morocco", "Mozambique", "Namibia", "Niger", "Nigeria",
+                   "São Tomé and Príncipe", "Senegal", "Seychelles", "Sierra Leone", "South Africa", 
+                   "Sudan", "Tanzania", "Togo", "Tunisia", "Uganda", "Zambia", "Zimbabwe")
+)
+#aligning character type to make merge possible
+data8$COUNTRY <- as.character(data8$COUNTRY)
+#joining country_mapping dataset 
+first_merge <- full_join(data8, country_mapping, by = "COUNTRY")
+
+merged_data <- full_join(first_merge, AidData, by = "COUNTRY")
+
+```
+
+Graph 1: Plotting the relationship between total investment and public perception
+
+```{r}
+# Summing the total investments across country 
+sum_investment_by_country <- function(merged_data, COUNTRY, Amount) {
+  merged_data |> 
+    group_by(across(all_of(COUNTRY))) |> 
+    summarise(total_investment = sum(across(all_of(Amount)), na.rm = TRUE)) |> 
+    arrange(desc(total_investment))
+}
+investment_summary <- sum_investment_by_country(merged_data, "COUNTRY", "Amount")
+
+# Disabling scientific notation
+options(scipen = 999)
+
+# Scatter plot: Total investment vs Public Perception
+ggplot(merged_data, aes(x = factor(Q65C), y = Amount)) + 
+  geom_point(alpha = 0.5, color = "blue") + 
+  labs(
+    title = "Total Investment vs. Public Perception", 
+    x = "Public Perception (Q65)", 
+    y = "Total Investment (USD)"
+  ) + 
+  theme_bw() + 
+  scale_y_continuous(labels = comma)
+
+# ggplot(merged_data, aes(x = factor(Q65C), y = Amount, fill = factor(Q65C))) +
+#   geom_col() +  
+#   geom_text(aes(label = COUNTRY), position = position_dodge(width = 0.9), vjust = -0.5, size = 3) +  # Add country names on top of bars
+#   labs(
+#     title = "Total Investment vs. Public Perception",
+#     x = "Public Perception (Q65)",
+#     y = "Total Investment (USD)"
+#   ) +
+#   theme_minimal() +
+#   scale_y_continuous(labels = comma) +
+#   theme(axis.text.x = element_text(angle = 45, hjust = 1))  # Rotate x-axis labels if needed
+
+```
+
+\
+
+Research Design 
+
+\
+
+	I will utilize a logistic regression to model the probability of the outcome because the outcome we are looking for is binary (yes or no). Y is the primary dependent variable indicating whether individuals perceive their government as having borrowed too much from China. X is the independent variable: the total amount of Chinese investment per country. Zk represents the covariates which in this case would be education and region (urban vs rural). 
+
+\
+
+Logit(P(Yi​=1))=β0​+β1​Xi​+β2​Z1​+β3​Z2​+⋯+βk​Zk​+ϵi​
+
+\
+
+Covariates 
+
+-   Education Level: A key covariate as  higher levels may correlate with more nuanced perceptions of foreign investments
+
+-   Income: Socioeconomic status may influence how aid is experienced. Those with low income levels may perceive less tangible benefits while those with higher levels experience more. 
+
+-   Region: Urban vs rural. Location could be another proxy for education level, geography could affect perception of aid.
+
+-   Trust in Government: An individual's level of trust in the government would mediate their perception of foreign borrowing.
+
+Threat to Causality: The variables I am using as a proxy for exposure to information regarding chinese aid are somewhat limited, but are employed due to constraints of available data. There is a potential that the coefficient could be biased given that the amount and type of information individuals are exposed to might be endogenous to the level of development finance in their country. These perceptions are also influenced by the government's stance and however they position their relationship with the lending country.
+
+Empirical extension: One empirical extension I will conduct to add credibility to my inference is to restrict the analysis to only respondents who live in regions that have received high levels of Chinese development finance—for example, counties or districts where large-scale infrastructure projects funded by China have been completed or are ongoing.By comparing perceptions of government borrowing among individuals within high-investment areas but with different levels of formal education, I can rule out the possibility that differences in regional investment exposure (i.e., whether someone lives in a high- vs. low-aid area) are driving the observed relationship between Chinese aid and borrowing perceptions.
+
+
+Bibliography
+
+@article{Brautigam2010,
+  author    = {Deborah Bräutigam},
+  title     = {China's Aid Policies in Africa: Opportunities and Challenges},
+  journal   = {The Royal Institute of International Affairs},
+  volume    = {86},
+  number    = {2},
+  pages     = {401--419},
+  year      = {2010},
+  doi       = {10.1080/00358530903513756},
+  url       = {https://www.tandfonline.com/doi/full/10.1080/00358530903513756}
+}
+
+@report{soule2024narratives,
+  author    = {Folashadé Soulé and Cobus van Staden and Lina Benabdallah and Yu-Shan Wu and Yunnan Chen},
+  title     = {Exploring the Role of Narratives in China-Africa Relations},
+  institution = {Africa Policy Research Institute},
+  year      = {2024},
+  month     = {June},
+  url       = {https://afripoli.org/exploring-the-role-of-narratives-in-china-africa-relations},
+  doi       = {10.59184/sa.044}
+}
+
+@article{ChineseWesternInvestmentsAfrica2020, 
+author = {{Peterson Najfiojor}},
+title = {Chinese and Western Investments in Africa: A Comparative Analysis}, 
+journal = {Journal of African Development}, 
+volume = {22}, 
+number = {2},
+pages = {1--23}, 
+year = {2020}, 
+doi = {10.1080/21598282.2020.1846583},
+url = {[https://www.tandfonline.com/doi/full/10.1080/21598282.2020.1846583}](https://www.tandfonline.com/doi/full/10.1080/21598282.2020.1846583}) }

@@ -1,0 +1,228 @@
+---
+title: "Data Assignment 1"
+title-prefix: "LihameA"
+lang: en
+date-format: long
+editor: visual
+execute:
+  echo: true
+toc: true
+link-citations: true
+document-css: false
+theme:
+  - cosmo
+  - brand
+css:
+  - styles.css
+format:
+  html:
+    standalone: true
+    section-divs: true
+    html-math-method: mathjax
+    wrap: none
+    default-image-extension: png
+    output-file: DA1.html
+---
+```{r}
+library(ggplot2)
+library(readr)
+library(ggdag)
+library(tidyverse)
+library(gt)
+library(modelsummary)
+
+# read-in data
+#dat = read_csv(here::here("workshops/aau_survey/clean_endline_did.csv" )) %>%
+data = read_csv("https://raw.githubusercontent.com/jrspringman/psci3200-globaldev/main/workshops/aau_survey/clean_endline_did.csv" ) %>%
+    # clean home region variable
+  mutate(q8_baseline = ifelse(q8_baseline == "Southern Nations, Nationalities, and Peoples Region", "SNNPR", q8_baseline), 
+         q8_baseline = str_remove(q8_baseline, " Region"))
+# create color palette for plotting
+palette = MetBrewer::met.brewer(name = "Cross")
+```
+
+Part 1:
+
+```{r}
+#Renaming columns 
+data <- data |> 
+  rename(
+    gender = q3_baseline, 
+    #Plans for a career in pub sector/ civil societies
+    work_civ_end = q26_civ, 
+    work_civ_base = q26_civ_baseline, 
+    work_politics_end = q26_politics, 
+    work_politics_base =  q26_politics_baseline, 
+    work_pub_sec_end = q26_public, 
+    work_pub_sec_base = q26_public_baseline,  
+    run_for_office = q27_1, 
+  #assuming q27_baseline_st is a completely different variable 
+    start_NGO = q27_3, 
+  
+    #your participation can bring positive change  
+    participation_changes_end = q17_3, 
+    participation_changes_base = q17_3_baseline, 
+   #youth engagement opportunity 
+    yengagement_opp_end = q17_1, 
+    yengagement_opp_base = q17_1_baseline, 
+   #youth bring positive change 
+    youth_changes_end = q17_2,
+    youth_changes_base= q17_2_baseline
+  )
+```
+
+Part 2: First, in your own words, explain the concept of an additive index and an averaged z-score, including how they are calculated, when you should use them, and when you cannot use them. What are the benefits of each approach?
+
+An additive index is a measuremnet where the combined effects of multiple variables is equal to the sum of their indiviual effects. It is calculated by finding the sum of variables for each case: Simple sum across columns (index = column_1 + column_2). It is used when interested in the cumulative ammount for something. For example, If you're trying to get the total amount a candidate or party spent across different categories (e.g., TV ads, online ads, travel, events), then an additive scale can be used. Additive scales are benneficial for their simplicity and interpretibility given that the unit remains the same and its calculated through adition. You cannot use them if the variables are of unequal importance or if they are measured on different scales. 
+
+An averaged z-score represents the distance of a variable from the mean (in standard deviations). Z-scores are particularly useful when comparing variables that measure the same concept but are in different units. For example, they are often used to compare student performance across subjects like math and reading. Z-scores are centered around 0, with a mean of 0 and a standard deviation of 1, making them easy to interpret—they indicate whether a value is above or below average. Z-scores help reduce the influence of outliers. They also assume the underlying data is normally distributed and should not be used when that assumption is violated. To calculate a z-score, subtract the mean of the variable from the individual value and then divide by the standard deviation. Averaging z-scores across variables can then provide a composite measure of performance or behavior on a shared scale.
+
+```{r}
+# Additive index: Summing up the two variables across rows to obtain seperate counts of the number of future plans that each indicidual has at baseline and endline. 
+
+data <- data |> 
+  rowwise() |> 
+  #new column where the sum of variables will be stored. Summing the two variables across rows to obtain seperate counts of the number of plans that each individual has at baseline and endline. 
+  mutate( 
+    future_plans_index_base = sum(c_across(c(work_civ_base, work_pub_sec_base)), na.rm = TRUE),
+    future_plans_index_end  = sum(c_across(c(work_civ_end, work_pub_sec_end)), na.rm = TRUE)
+  ) |> 
+  ungroup()
+
+# Standardizing variables and average z-scores
+data <- data |> 
+  mutate(across(
+    #applying the scale function to standardize the variables, creating a z-score for each variable. 
+    c(work_civ_base, work_politics_base, work_pub_sec_base, 
+      participation_changes_base, yengagement_opp_base, youth_changes_base),
+    #creating new columns with suffix z 
+    scale, .names = "{.col}_z"
+  )) |> 
+  mutate(across(
+    c(work_civ_end, work_politics_end, work_pub_sec_end, 
+      participation_changes_end, yengagement_opp_end, youth_changes_end),
+    scale, .names = "{.col}_z"
+  )) |>
+  #summing 
+  rowwise() |>
+  
+  #selecting all columns ending in base 2 and calculcaing the mean of those variables
+  mutate(
+    efficacy_index_base = mean(c_across(ends_with("_base_z")), na.rm = TRUE),
+    efficacy_index_end = mean(c_across(ends_with("_end_z")), na.rm = TRUE)
+  ) |>
+  ungroup()
+print(data)
+```
+
+4. Creating a ggplot to visualie the distribution of z-scores at baseline and endline. You should have 4 figures: one corresponding to each z-score at baseline and endline. In words, describe whether the figures tell us anything about changes over time.
+--- 
+Description: You should have 4 figures: one corresponding to each z-score at baseline and endline. In words, describe whether the figures tell us anything about changes over time.
+
+The figures for future plans show that both z-score indices do not change much overtime. The figures show that z-score distributions remain relatively stable over time. For future plans, most responses cluster around the mean, with a dip in density near a z-score of 0.5 and a slight rise at z = 1. This suggests a mild polarization, where participants are either average or more confident in their outlooks, with fewer expressing moderate views. Overall, there’s no strong evidence of a significant shift over time.
+
+The figures for political efficacy at both baseline and endline show a roughly normal distribution, with the highest density centered around a z-score of 0. This indicates that most participants reported levels of political efficacy that were close to the average, suggesting a central tendency in how individuals perceive their influence or understanding of political systems. The symmetry and concentration around the mean also imply that there were few extreme responses—either very low or very high levels of political efficacy. Additionally, the similarity between the baseline and endline distributions suggests that participants’ sense of political efficacy did not change significantly over time, pointing to a general stability in their political attitudes across the study period.
+
+```{r}
+#1: Future plans index base 
+data_clean <- data |> filter(!is.na(future_plans_index_base))
+future_base <- data |> 
+  ggplot(aes(x = future_plans_index_base)) + geom_density(fill = "blue", alpha = 0.6) +
+  labs(title = "Z-score Index: Future plans Baseline", x = "Z-score", y = "Density") + 
+  theme_bw() 
+future_base
+
+#2: Future plans index end
+data_clean <- data |> filter(!is.na(future_plans_index_end))
+future_end <- data |> 
+  ggplot(aes(x = future_plans_index_end)) + geom_density(fill = "orange", alpha = 0.6) +
+  labs(title = "Z-score Index: Future plans Endline", x = "Z-score", y = "Density") + 
+  theme_bw() 
+future_end
+
+#3: Political Efficacy base 
+data_clean <- data |> filter(!is.na(efficacy_index_base))
+political_efficacy <- data |> 
+ ggplot(aes(x = efficacy_index_base)) + geom_density(fill = "darkgreen", alpha = 0.6) +
+  labs(title = "Z-score Index: Political Efficacy Baseline", x = "Z-score", y = "Density") + 
+  theme_bw() 
+political_efficacy
+
+#4: Political Efficacy end 
+data_clean <- data |> filter(!is.na(efficacy_index_end))
+political_efficacy <- data |> 
+ ggplot(aes(x = efficacy_index_end)) + geom_density(fill = "brown", alpha = 0.6) +
+  labs(title = "Z-score Index: Political Efficacy Baseline", x = "Z-score", y = "Density") + 
+  theme_bw() 
+political_efficacy
+```
+
+
+Requirement 5: 
+
+Use the modelsummary()package to visualize the results as a table. In your own words, interpret the meaning ofand  Substantively, how should we interpret the relationship described in the data? What does this tell us about the world? What assumptions would we need in order to interpret the relationship as causal?
+
+The regression shows a strong, positive relationship between political efficacy and future plans at the time of baseline. Students who feel more politically empowered are also more likely to have clearer or stronger plans for the future. This suggests that a sense of political agency may be linked to a greater sense of direction in life. To interpret this relationship as causal, we’d need to assume there are no unmeasured confounding variables, that political efficacy precedes future planning, and that the measures accurately capture the intended concepts.
+
+```{r}
+data_selected <- data |> 
+  #Selecting for desires columns 
+  select(
+    response_id,
+    gender,
+    efficacy_index_end, 
+      efficacy_index_base,
+      future_plans_index_end, 
+      future_plans_index_base
+  )
+# linear model indexing on efficacy variable and using
+model <- lm(future_plans_index_base ~ efficacy_index_base, data = data)
+
+summary(model)
+
+```
+
+Requirment 6:
+
+Use the modelsummary()package to visualize the results as a table. In your own words, interpret the meaning of and Substantively, how should we interpret the interactive relationship described in the data?
+
+The data suggest that feelings of political efficacy are more strongly linked to future planning among women than among men. While efficacy increases the likelihood of having future plans for both genders, the effect is about 21% weaker for men. This could imply that political empowerment has a more mobilizing or confidence-building effect on women's future orientation than it does for men. I suspect this is because they face more systemic barriers and thus benefit more from increased efficacy.
+
+```{r}
+
+# Creating binary efficacy variables based on whether a student is above or below the mean
+data <- data |> 
+  mutate(
+    efficacy_binary_base = if_else(
+      efficacy_index_base >= mean(efficacy_index_base, na.rm = TRUE), 1, 0
+    ),
+    efficacy_binary_end = if_else(
+      efficacy_index_end >= mean(efficacy_index_end, na.rm = TRUE), 1, 0
+    )
+  )
+
+# Fitring the model with an interaction between political efficacy and gender
+model <- lm(future_plans_index_base ~ efficacy_binary_base * gender, data = data)
+
+#table 
+modelsummary(model)
+```
+
+
+Requirement 7:
+In your own words, tell us how the meaning of has changed now that we’ve added fixed effects.
+
+```{r}
+# # Converting wide to long format
+# data_long <- data =
+#   pivot_longer(
+#     cols = c(future_plans_index_base,future_plans_index_end,
+#              efficacy_base, efficacy_end),
+#     names_to = c(".value", "timepoint"),
+#     names_sep = "_"
+#   )
+# 
+# # Running fixed effects modeol using 'feols()` from fixest with response_id fixed effects
+# model_fe <- feols(fumture_plans ~ efficacy | response_id, data = data_long)
+# # modelsummary(model_fe, stars = TRUE)
+```
